@@ -85,7 +85,7 @@ MIN_PAYOUT_PERCENTAGE = 80
 MAX_DAILY_TRADES = 30
 
 # عدد التأكيدات المطلوبة للدخول (من 12 مؤشر)
-MIN_CONFIRMATIONS = 8
+MIN_CONFIRMATIONS = 6
 
 # إعدادات الإشارات التلقائية (بالدقائق)
 AUTO_SIGNAL_INTERVAL = 5
@@ -117,10 +117,10 @@ DEFAULT_CAPITAL = 100  # $
 # ═══════════════════════════════════════════════════════════════
 
 # Grade A: إشارة ممتازة
-GRADE_A_MIN_CONFIRMATIONS = 10
+GRADE_A_MIN_CONFIRMATIONS = 9
 
 # Grade B: إشارة جيدة
-GRADE_B_MIN_CONFIRMATIONS = 8
+GRADE_B_MIN_CONFIRMATIONS = 7
 
 # Grade C: إشارة مقبولة
 GRADE_C_MIN_CONFIRMATIONS = 6

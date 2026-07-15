@@ -1,5 +1,6 @@
 """
 محرك الإشارات المتقدم - توليد إشارات CALL/PUT مع نظام تقييم الجودة
+الإصدار المحسّن: شروط واقعية تعمل في ظروف السوق العادية
 """
 
 import pandas as pd
@@ -25,6 +26,7 @@ TOTAL_INDICATORS = 12
 def analyze_signal(df):
     """
     يحلل آخر عدة شموع باستخدام 12 مؤشر ويعيد تأكيدات CALL و PUT.
+    شروط محسّنة تعمل في ظروف السوق العادية (ليست فقط المتطرفة).
     
     Returns:
         tuple: (call_conf, put_conf, reasons_call, reasons_put)
@@ -42,28 +44,29 @@ def analyze_signal(df):
     reasons_put = []
 
     close = float(latest['Close'])
+    prev_close = float(prev['Close'])
 
     # ═══════════════════════════════════════
-    # 1. RSI (مؤشر القوة النسبية)
+    # 1. RSI (مؤشر القوة النسبية) - شروط موسّعة
     # ═══════════════════════════════════════
     try:
         rsi = float(latest['RSI'])
         prev_rsi = float(prev['RSI'])
 
-        if rsi < RSI_OVERSOLD:
+        # تشبع كلاسيكي
+        if rsi < 35:
             call_conf += 1
             reasons_call.append("RSI تشبع بيع")
-        elif rsi > RSI_OVERBOUGHT:
+        elif rsi > 65:
             put_conf += 1
             reasons_put.append("RSI تشبع شراء")
-
-        # RSI Divergence (تباعد)
-        if rsi > prev_rsi and close < float(prev['Close']):
+        # اتجاه RSI
+        elif rsi < 45 and prev_rsi < rsi:
             call_conf += 1
-            reasons_call.append("تباعد RSI صاعد")
-        elif rsi < prev_rsi and close > float(prev['Close']):
+            reasons_call.append("RSI صاعد من القاع")
+        elif rsi > 55 and prev_rsi > rsi:
             put_conf += 1
-            reasons_put.append("تباعد RSI هابط")
+            reasons_put.append("RSI هابط من القمة")
     except Exception:
         pass
 
@@ -75,6 +78,8 @@ def analyze_signal(df):
         macd_signal = float(latest['MACD_Signal'])
         prev_macd = float(prev['MACD'])
         prev_macd_signal = float(prev['MACD_Signal'])
+        macd_diff = float(latest.get('MACD_Diff', macd - macd_signal))
+        prev_macd_diff = float(prev.get('MACD_Diff', prev_macd - prev_macd_signal))
 
         # تقاطع MACD (إشارة قوية)
         if macd > macd_signal and prev_macd <= prev_macd_signal:
@@ -83,11 +88,18 @@ def analyze_signal(df):
         elif macd < macd_signal and prev_macd >= prev_macd_signal:
             put_conf += 1
             reasons_put.append("MACD تقاطع هابط")
-        # اتجاه MACD
-        elif macd > macd_signal:
+        # اتجاه MACD (الهيستوجرام يتزايد/يتناقص)
+        elif macd > macd_signal and macd_diff > prev_macd_diff:
+            call_conf += 1
+            reasons_call.append("MACD+ متزايد")
+        elif macd < macd_signal and macd_diff < prev_macd_diff:
+            put_conf += 1
+            reasons_put.append("MACD- متزايد")
+        # MACD فوق/تحت الصفر
+        elif macd > 0 and macd > macd_signal:
             call_conf += 1
             reasons_call.append("MACD إيجابي")
-        elif macd < macd_signal:
+        elif macd < 0 and macd < macd_signal:
             put_conf += 1
             reasons_put.append("MACD سلبي")
     except Exception:
@@ -101,12 +113,20 @@ def analyze_signal(df):
         ema13 = float(latest['EMA_13'])
         ema21 = float(latest['EMA_21'])
 
+        # ترتيب كامل
         if ema5 > ema13 > ema21:
             call_conf += 1
             reasons_call.append("EMA ترتيب صاعد")
         elif ema5 < ema13 < ema21:
             put_conf += 1
             reasons_put.append("EMA ترتيب هابط")
+        # السعر فوق/تحت EMA
+        elif close > ema5 and close > ema13:
+            call_conf += 1
+            reasons_call.append("السعر فوق EMA")
+        elif close < ema5 and close < ema13:
+            put_conf += 1
+            reasons_put.append("السعر تحت EMA")
     except Exception:
         pass
 
@@ -118,23 +138,28 @@ def analyze_signal(df):
         bb_upper = float(latest['BB_Upper'])
         bb_middle = float(latest['BB_Middle'])
 
-        if close <= bb_lower:
-            call_conf += 1
-            reasons_call.append("BB ارتداد من القاع")
-        elif close >= bb_upper:
-            put_conf += 1
-            reasons_put.append("BB ارتداد من القمة")
-        elif close > bb_middle and float(prev['Close']) <= bb_middle:
-            call_conf += 1
-            reasons_call.append("BB اختراق الوسط ↑")
-        elif close < bb_middle and float(prev['Close']) >= bb_middle:
-            put_conf += 1
-            reasons_put.append("BB اختراق الوسط ↓")
+        # حساب موقع السعر في البولنجر (0-100%)
+        bb_range = bb_upper - bb_lower
+        if bb_range > 0:
+            bb_position = (close - bb_lower) / bb_range * 100
+
+            if bb_position <= 15:
+                call_conf += 1
+                reasons_call.append("BB قرب القاع")
+            elif bb_position >= 85:
+                put_conf += 1
+                reasons_put.append("BB قرب القمة")
+            elif close > bb_middle and prev_close <= bb_middle:
+                call_conf += 1
+                reasons_call.append("BB اختراق الوسط ↑")
+            elif close < bb_middle and prev_close >= bb_middle:
+                put_conf += 1
+                reasons_put.append("BB اختراق الوسط ↓")
     except Exception:
         pass
 
     # ═══════════════════════════════════════
-    # 5. Stochastic (الاستوكاستيك)
+    # 5. Stochastic (الاستوكاستيك) - شروط موسّعة
     # ═══════════════════════════════════════
     try:
         stoch_k = float(latest['Stoch_K'])
@@ -142,66 +167,99 @@ def analyze_signal(df):
         prev_stoch_k = float(prev['Stoch_K'])
         prev_stoch_d = float(prev['Stoch_D'])
 
-        # تشبع + تقاطع (إشارة قوية)
-        if stoch_k < STOCH_OVERSOLD and stoch_k > stoch_d and prev_stoch_k <= prev_stoch_d:
+        # تشبع + تقاطع
+        if stoch_k < 30 and stoch_k > stoch_d:
             call_conf += 1
-            reasons_call.append("Stoch تقاطع صاعد")
-        elif stoch_k > STOCH_OVERBOUGHT and stoch_k < stoch_d and prev_stoch_k >= prev_stoch_d:
+            reasons_call.append("Stoch صاعد من التشبع")
+        elif stoch_k > 70 and stoch_k < stoch_d:
             put_conf += 1
-            reasons_put.append("Stoch تقاطع هابط")
-        # تشبع فقط
-        elif stoch_k < STOCH_OVERSOLD:
+            reasons_put.append("Stoch هابط من التشبع")
+        # تقاطع K و D
+        elif stoch_k > stoch_d and prev_stoch_k <= prev_stoch_d:
             call_conf += 1
-            reasons_call.append("Stoch تشبع بيع")
-        elif stoch_k > STOCH_OVERBOUGHT:
+            reasons_call.append("Stoch تقاطع ↑")
+        elif stoch_k < stoch_d and prev_stoch_k >= prev_stoch_d:
             put_conf += 1
-            reasons_put.append("Stoch تشبع شراء")
+            reasons_put.append("Stoch تقاطع ↓")
+        # اتجاه عام
+        elif stoch_k < 35:
+            call_conf += 1
+            reasons_call.append("Stoch منطقة بيع")
+        elif stoch_k > 65:
+            put_conf += 1
+            reasons_put.append("Stoch منطقة شراء")
     except Exception:
         pass
 
     # ═══════════════════════════════════════
-    # 6. CCI (مؤشر قناة السلع)
+    # 6. CCI (مؤشر قناة السلع) - شروط موسّعة
     # ═══════════════════════════════════════
     try:
         cci = float(latest['CCI'])
-        if cci < CCI_OVERSOLD:
+        prev_cci = float(prev['CCI'])
+
+        if cci < -50:
             call_conf += 1
-            reasons_call.append("CCI تشبع بيع")
-        elif cci > CCI_OVERBOUGHT:
+            reasons_call.append("CCI سلبي")
+        elif cci > 50:
             put_conf += 1
-            reasons_put.append("CCI تشبع شراء")
+            reasons_put.append("CCI إيجابي")
+        # CCI يتحول
+        elif cci > prev_cci and cci > -20 and prev_cci < -20:
+            call_conf += 1
+            reasons_call.append("CCI يتحول ↑")
+        elif cci < prev_cci and cci < 20 and prev_cci > 20:
+            put_conf += 1
+            reasons_put.append("CCI يتحول ↓")
     except Exception:
         pass
 
     # ═══════════════════════════════════════
-    # 7. Williams %R
+    # 7. Williams %R - شروط موسّعة
     # ═══════════════════════════════════════
     try:
         williams = float(latest['Williams_R'])
-        if williams < WILLIAMS_OVERSOLD:
+        prev_williams = float(prev['Williams_R'])
+
+        if williams < -70:
             call_conf += 1
             reasons_call.append("W%R تشبع بيع")
-        elif williams > WILLIAMS_OVERBOUGHT:
+        elif williams > -30:
             put_conf += 1
             reasons_put.append("W%R تشبع شراء")
+        # Williams يتحول
+        elif williams > prev_williams and williams < -50:
+            call_conf += 1
+            reasons_call.append("W%R صاعد")
+        elif williams < prev_williams and williams > -50:
+            put_conf += 1
+            reasons_put.append("W%R هابط")
     except Exception:
         pass
 
     # ═══════════════════════════════════════
-    # 8. ADX + DI (قوة الاتجاه)
+    # 8. ADX + DI (قوة الاتجاه) - شروط موسّعة
     # ═══════════════════════════════════════
     try:
         adx = float(latest['ADX'])
         adx_pos = float(latest['ADX_Pos'])
         adx_neg = float(latest['ADX_Neg'])
 
-        if adx > ADX_STRONG_TREND:
+        # اتجاه قوي
+        if adx > 20:
             if adx_pos > adx_neg:
                 call_conf += 1
-                reasons_call.append("ADX اتجاه صاعد قوي")
+                reasons_call.append("ADX صاعد")
             elif adx_neg > adx_pos:
                 put_conf += 1
-                reasons_put.append("ADX اتجاه هابط قوي")
+                reasons_put.append("ADX هابط")
+        # حتى بدون ADX قوي، DI يعطي إشارة
+        elif adx_pos > adx_neg * 1.3:
+            call_conf += 1
+            reasons_call.append("DI+ مسيطر")
+        elif adx_neg > adx_pos * 1.3:
+            put_conf += 1
+            reasons_put.append("DI- مسيطر")
     except Exception:
         pass
 
@@ -212,14 +270,7 @@ def analyze_signal(df):
         psar = float(latest['PSAR'])
         prev_psar = float(prev['PSAR'])
 
-        if close > psar and float(prev['Close']) <= prev_psar:
-            # انعكاس SAR - إشارة قوية
-            call_conf += 1
-            reasons_call.append("SAR انعكاس صاعد")
-        elif close < psar and float(prev['Close']) >= prev_psar:
-            put_conf += 1
-            reasons_put.append("SAR انعكاس هابط")
-        elif close > psar:
+        if close > psar:
             call_conf += 1
             reasons_call.append("SAR صاعد")
         elif close < psar:
@@ -237,12 +288,23 @@ def analyze_signal(df):
         ich_conv = float(latest['Ichimoku_Conv'])
         ich_base = float(latest['Ichimoku_Base'])
 
-        if close > ich_a and close > ich_b and ich_conv > ich_base:
+        # السعر فوق/تحت السحابة
+        cloud_top = max(ich_a, ich_b)
+        cloud_bottom = min(ich_a, ich_b)
+
+        if close > cloud_top:
             call_conf += 1
-            reasons_call.append("Ichimoku صاعد")
-        elif close < ich_a and close < ich_b and ich_conv < ich_base:
+            reasons_call.append("فوق سحابة Ichimoku")
+        elif close < cloud_bottom:
             put_conf += 1
-            reasons_put.append("Ichimoku هابط")
+            reasons_put.append("تحت سحابة Ichimoku")
+        # Conversion vs Base
+        elif ich_conv > ich_base:
+            call_conf += 1
+            reasons_call.append("Ichimoku Conv>Base")
+        elif ich_conv < ich_base:
+            put_conf += 1
+            reasons_put.append("Ichimoku Conv<Base")
     except Exception:
         pass
 
@@ -251,14 +313,22 @@ def analyze_signal(df):
     # ═══════════════════════════════════════
     try:
         closes = [float(df.iloc[-i]['Close']) for i in range(1, 5)]
-        # 3 شموع هابطة متتالية = احتمال ارتداد صعودي
-        if closes[0] < closes[1] < closes[2] < closes[3]:
+        
+        # 2+ شموع في نفس الاتجاه
+        if closes[0] > closes[1] and closes[1] > closes[2]:
             call_conf += 1
-            reasons_call.append("3 شموع هابطة (ارتداد)")
-        # 3 شموع صاعدة متتالية = احتمال ارتداد هبوطي
-        elif closes[0] > closes[1] > closes[2] > closes[3]:
+            reasons_call.append("زخم صاعد")
+        elif closes[0] < closes[1] and closes[1] < closes[2]:
             put_conf += 1
-            reasons_put.append("3 شموع صاعدة (ارتداد)")
+            reasons_put.append("زخم هابط")
+        # ارتداد بعد هبوط
+        elif closes[0] > closes[1] and closes[1] < closes[2] and closes[2] < closes[3]:
+            call_conf += 1
+            reasons_call.append("ارتداد صاعد")
+        # ارتداد بعد صعود
+        elif closes[0] < closes[1] and closes[1] > closes[2] and closes[2] > closes[3]:
+            put_conf += 1
+            reasons_put.append("ارتداد هابط")
     except Exception:
         pass
 
@@ -271,21 +341,31 @@ def analyze_signal(df):
         upper_shadow = float(latest['Candle_Upper_Shadow'])
         body_abs = abs(body)
 
-        # Pin Bar صاعد (ذيل سفلي طويل)
-        if lower_shadow > body_abs * 2 and upper_shadow < body_abs * 0.5:
-            call_conf += 1
-            reasons_call.append("Pin Bar صاعد")
-        # Pin Bar هابط (ذيل علوي طويل)
-        elif upper_shadow > body_abs * 2 and lower_shadow < body_abs * 0.5:
-            put_conf += 1
-            reasons_put.append("Pin Bar هابط")
-        # Engulfing (ابتلاع)
-        elif body > 0 and float(prev['Candle_Body']) < 0 and body_abs > abs(float(prev['Candle_Body'])):
-            call_conf += 1
-            reasons_call.append("ابتلاع صاعد")
-        elif body < 0 and float(prev['Candle_Body']) > 0 and body_abs > abs(float(prev['Candle_Body'])):
-            put_conf += 1
-            reasons_put.append("ابتلاع هابط")
+        if body_abs > 0:
+            # Pin Bar صاعد (ذيل سفلي طويل)
+            if lower_shadow > body_abs * 1.5 and upper_shadow < body_abs:
+                call_conf += 1
+                reasons_call.append("Pin Bar صاعد")
+            # Pin Bar هابط (ذيل علوي طويل)
+            elif upper_shadow > body_abs * 1.5 and lower_shadow < body_abs:
+                put_conf += 1
+                reasons_put.append("Pin Bar هابط")
+            # شمعة صاعدة قوية
+            elif body > 0 and body_abs > lower_shadow and body_abs > upper_shadow:
+                call_conf += 1
+                reasons_call.append("شمعة صاعدة قوية")
+            # شمعة هابطة قوية
+            elif body < 0 and body_abs > lower_shadow and body_abs > upper_shadow:
+                put_conf += 1
+                reasons_put.append("شمعة هابطة قوية")
+        else:
+            # Doji - نستخدم الاتجاه السابق
+            if prev_close > float(df.iloc[-3]['Close']):
+                put_conf += 1
+                reasons_put.append("Doji بعد صعود")
+            elif prev_close < float(df.iloc[-3]['Close']):
+                call_conf += 1
+                reasons_call.append("Doji بعد هبوط")
     except Exception:
         pass
 
@@ -312,10 +392,6 @@ def get_signal_grade(confirmations):
 def check_support_resistance_filter(df):
     """
     فلتر إضافي: هل السعر قريب من دعم/مقاومة؟
-    يعطي نقاط إضافية للإشارات القريبة من مستويات مهمة.
-    
-    Returns:
-        dict مع معلومات الدعم والمقاومة
     """
     try:
         latest = df.iloc[-1]
@@ -325,15 +401,14 @@ def check_support_resistance_filter(df):
 
         price_range = resistance - support if resistance > support else 1
 
-        # المسافة من الدعم والمقاومة كنسبة
         dist_to_support = (close - support) / price_range if price_range > 0 else 0.5
         dist_to_resistance = (resistance - close) / price_range if price_range > 0 else 0.5
 
         return {
             "support": support,
             "resistance": resistance,
-            "near_support": dist_to_support < 0.15,  # قريب من الدعم (15%)
-            "near_resistance": dist_to_resistance < 0.15,  # قريب من المقاومة (15%)
+            "near_support": dist_to_support < 0.20,
+            "near_resistance": dist_to_resistance < 0.20,
             "dist_to_support_pct": dist_to_support * 100,
             "dist_to_resistance_pct": dist_to_resistance * 100,
         }
@@ -380,30 +455,21 @@ def generate_signal_for_asset(df, min_conf_override=None):
     sr_info = check_support_resistance_filter(df_clean)
 
     # ═══════════════════════════════════════
-    # فلترة متقدمة لتقليل الإشارات الخاطئة
+    # فلترة لتقليل الإشارات الخاطئة
     # ═══════════════════════════════════════
 
-    # فلتر 1: يجب أن يكون الفرق بين CALL و PUT واضح (3+ نقاط)
+    # فلتر: يجب أن يكون الفرق بين CALL و PUT واضح (2+ نقاط)
     if abs(call_conf - put_conf) < 2:
         return None
 
-    # فلتر 2: فحص ADX - إذا لا يوجد اتجاه واضح، لا نعطي إشارة
-    try:
-        adx_val = float(df_clean.iloc[-1].get('ADX', 0))
-        # إذا ADX ضعيف جداً والإشارة ليست قوية جداً
-        if adx_val < 15 and max(call_conf, put_conf) < GRADE_A_MIN_CONFIRMATIONS:
-            return None
-    except Exception:
-        pass
-
-    # فلتر 3: تعزيز الإشارة إذا كانت قريبة من دعم/مقاومة
+    # تعزيز الإشارة إذا كانت قريبة من دعم/مقاومة
     sr_bonus = ""
     if sr_info["near_support"] and call_conf > put_conf:
-        call_conf += 1  # نقطة إضافية
-        sr_bonus = "قرب الدعم"
+        call_conf += 1
+        sr_bonus = "قرب الدعم 🎯"
     elif sr_info["near_resistance"] and put_conf > call_conf:
-        put_conf += 1  # نقطة إضافية
-        sr_bonus = "قرب المقاومة"
+        put_conf += 1
+        sr_bonus = "قرب المقاومة 🎯"
 
     # توليد الإشارة النهائية
     if call_conf >= min_conf and call_conf > put_conf:
