@@ -14,17 +14,40 @@ TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # أزواج العملات OTC المتاحة على Pocket Option
 # ═══════════════════════════════════════════════════════════════
 ASSETS_TO_MONITOR = [
-    {"symbol": "AUDCAD=X", "name": "AUD/CAD-OTC", "category": "Cross"},
-    {"symbol": "AUDCHF=X", "name": "AUD/CHF-OTC", "category": "Cross"},
-    {"symbol": "AUDNZD=X", "name": "AUD/NZD-OTC", "category": "Cross"},
-    {"symbol": "EURCHF=X", "name": "EUR/CHF-OTC", "category": "Cross"},
-    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Major"},
-    {"symbol": "EURNZD=X", "name": "EUR/NZD-OTC", "category": "Cross"},
-    {"symbol": "EURGBP=X", "name": "EUR/GBP-OTC", "category": "Cross"},
-    {"symbol": "EURJPY=X", "name": "EUR/JPY-OTC", "category": "JPY"},
-    {"symbol": "CADCHF=X", "name": "CAD/CHF-OTC", "category": "Cross"},
-    {"symbol": "CADJPY=X", "name": "CAD/JPY-OTC", "category": "JPY"},
-    {"symbol": "CHFJPY=X", "name": "CHF/JPY-OTC", "category": "JPY"},
+    # ═══ أزواج الفوركس OTC (عالية الأداء) ═══
+    {"symbol": "AUDCAD=X", "name": "AUD/CAD-OTC", "category": "Forex"},
+    {"symbol": "AUDCHF=X", "name": "AUD/CHF-OTC", "category": "Forex"},
+    {"symbol": "AUDNZD=X", "name": "AUD/NZD-OTC", "category": "Forex"},
+    {"symbol": "EURCHF=X", "name": "EUR/CHF-OTC", "category": "Forex"},
+    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Forex"},
+    {"symbol": "EURNZD=X", "name": "EUR/NZD-OTC", "category": "Forex"},
+    {"symbol": "EURGBP=X", "name": "EUR/GBP-OTC", "category": "Forex"},
+    {"symbol": "EURJPY=X", "name": "EUR/JPY-OTC", "category": "Forex"},
+    {"symbol": "CADCHF=X", "name": "CAD/CHF-OTC", "category": "Forex"},
+    {"symbol": "CADJPY=X", "name": "CAD/JPY-OTC", "category": "Forex"},
+    {"symbol": "CHFJPY=X", "name": "CHF/JPY-OTC", "category": "Forex"},
+    # ═══ العملات المشفرة ═══
+    {"symbol": "BTC-USD", "name": "Bitcoin", "category": "Crypto"},
+    {"symbol": "ETH-USD", "name": "Ethereum", "category": "Crypto"},
+    {"symbol": "BNB-USD", "name": "BNB", "category": "Crypto"},
+    {"symbol": "SOL-USD", "name": "Solana", "category": "Crypto"},
+    {"symbol": "XRP-USD", "name": "Ripple", "category": "Crypto"},
+    {"symbol": "DOGE-USD", "name": "Dogecoin", "category": "Crypto"},
+    {"symbol": "ADA-USD", "name": "Cardano", "category": "Crypto"},
+    {"symbol": "AVAX-USD", "name": "Avalanche", "category": "Crypto"},
+    {"symbol": "DOT-USD", "name": "Polkadot", "category": "Crypto"},
+    {"symbol": "MATIC-USD", "name": "Polygon", "category": "Crypto"},
+    # ═══ الأسهم الأمريكية ═══
+    {"symbol": "AAPL", "name": "Apple", "category": "Stocks"},
+    {"symbol": "TSLA", "name": "Tesla", "category": "Stocks"},
+    {"symbol": "MSFT", "name": "Microsoft", "category": "Stocks"},
+    {"symbol": "AMZN", "name": "Amazon", "category": "Stocks"},
+    {"symbol": "GOOGL", "name": "Google", "category": "Stocks"},
+    {"symbol": "META", "name": "Meta", "category": "Stocks"},
+    {"symbol": "NVDA", "name": "Nvidia", "category": "Stocks"},
+    {"symbol": "NFLX", "name": "Netflix", "category": "Stocks"},
+    {"symbol": "AMD", "name": "AMD", "category": "Stocks"},
+    {"symbol": "COIN", "name": "Coinbase", "category": "Stocks"},
 ]
 
 # ═══════════════════════════════════════════════════════════════
