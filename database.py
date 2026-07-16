@@ -56,7 +56,7 @@ class UserSettings(BaseModel):
     """إعدادات المستخدم"""
     user_id = IntegerField(unique=True)
     auto_signals = BooleanField(default=False)
-    min_confirmations = IntegerField(default=8)
+    min_confirmations = IntegerField(default=6)
     max_trades_per_day = IntegerField(default=30)
     preferred_assets = CharField(default="all")  # all أو قائمة مفصولة بفاصلة
     signal_interval = IntegerField(default=5)  # بالدقائق
@@ -106,6 +106,13 @@ def initialize_db():
     try:
         db.connect(reuse_if_open=True)
         db.create_tables([Trade, UserSettings, DailyStats, AssetPerformance], safe=True)
+        # تحديث إعدادات المستخدمين القدامى
+        try:
+            UserSettings.update(min_confirmations=6).where(
+                UserSettings.min_confirmations > 6
+            ).execute()
+        except Exception:
+            pass
         logger.info("✅ تم تهيئة قاعدة البيانات")
     except Exception as e:
         logger.error(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")

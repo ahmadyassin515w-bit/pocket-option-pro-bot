@@ -14,21 +14,17 @@ TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # أزواج العملات OTC المتاحة على Pocket Option
 # ═══════════════════════════════════════════════════════════════
 ASSETS_TO_MONITOR = [
-    {"symbol": "CADJPY=X", "name": "CAD/JPY-OTC", "category": "JPY"},
-    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Major"},
-    {"symbol": "AUDNZD=X", "name": "AUD/NZD-OTC", "category": "Cross"},
-    {"symbol": "EURGBP=X", "name": "EUR/GBP-OTC", "category": "Cross"},
     {"symbol": "AUDCAD=X", "name": "AUD/CAD-OTC", "category": "Cross"},
-    {"symbol": "GBPUSD=X", "name": "GBP/USD-OTC", "category": "Major"},
-    {"symbol": "USDJPY=X", "name": "USD/JPY-OTC", "category": "JPY"},
-    {"symbol": "NZDUSD=X", "name": "NZD/USD-OTC", "category": "Major"},
-    {"symbol": "EURJPY=X", "name": "EUR/JPY-OTC", "category": "JPY"},
-    {"symbol": "GBPJPY=X", "name": "GBP/JPY-OTC", "category": "JPY"},
-    {"symbol": "AUDUSD=X", "name": "AUD/USD-OTC", "category": "Major"},
-    {"symbol": "USDCHF=X", "name": "USD/CHF-OTC", "category": "Major"},
+    {"symbol": "AUDCHF=X", "name": "AUD/CHF-OTC", "category": "Cross"},
+    {"symbol": "AUDNZD=X", "name": "AUD/NZD-OTC", "category": "Cross"},
     {"symbol": "EURCHF=X", "name": "EUR/CHF-OTC", "category": "Cross"},
-    {"symbol": "GBPCHF=X", "name": "GBP/CHF-OTC", "category": "Cross"},
+    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Major"},
+    {"symbol": "EURNZD=X", "name": "EUR/NZD-OTC", "category": "Cross"},
+    {"symbol": "EURGBP=X", "name": "EUR/GBP-OTC", "category": "Cross"},
+    {"symbol": "EURJPY=X", "name": "EUR/JPY-OTC", "category": "JPY"},
     {"symbol": "CADCHF=X", "name": "CAD/CHF-OTC", "category": "Cross"},
+    {"symbol": "CADJPY=X", "name": "CAD/JPY-OTC", "category": "JPY"},
+    {"symbol": "CHFJPY=X", "name": "CHF/JPY-OTC", "category": "JPY"},
 ]
 
 # ═══════════════════════════════════════════════════════════════
