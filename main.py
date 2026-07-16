@@ -285,6 +285,114 @@ async def analyze_all_assets(user_id=0, min_conf=None):
 
 
 # ═══════════════════════════════════════════════════════════════
+# أوامر الفئات المنفصلة: /forex /crypto /stocks
+# ═══════════════════════════════════════════════════════════════
+
+async def analyze_by_category(update: Update, context: ContextTypes.DEFAULT_TYPE, category: str, category_name: str):
+    """تحليل أصول فئة محددة"""
+    user_id = update.effective_user.id
+
+    risk_check = check_risk_limits(user_id)
+    if risk_check["should_stop"]:
+        await update.message.reply_text(
+            f"⛔ تم إيقاف التداول اليوم\n\nالسبب: {risk_check['reason']}\n\n💡 يُنصح بالراحة والعودة غداً"
+        )
+        return
+
+    await update.message.reply_text(f"⏳ جاري تحليل {category_name} بـ 12 مؤشر فني...")
+
+    settings = get_user_settings(user_id)
+    min_conf = settings.min_confirmations if settings else MIN_CONFIRMATIONS
+
+    signals_list = []
+    now = get_local_time()
+
+    category_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == category]
+
+    for asset_info in category_assets:
+        if len(signals_list) >= MAX_SIGNALS_PER_REQUEST:
+            break
+
+        symbol = asset_info["symbol"]
+        name = asset_info["name"]
+
+        try:
+            data = fetch_forex_data(symbol, name)
+            if data is None or data.empty or len(data) < 30:
+                continue
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+            df_ta = calculate_all_indicators(data.copy())
+            if df_ta is None or df_ta.empty:
+                continue
+            signal = generate_signal_for_asset(df_ta, min_conf_override=min_conf)
+            if signal:
+                signal_time = now + timedelta(minutes=len(signals_list) * 2 + 1)
+                time_str = signal_time.strftime("%H:%M")
+                direction_emoji = "🟢 CALL ↑" if signal["direction"] == "CALL" else "🔴 PUT ↓"
+                conf = signal["confirmations"]
+                total = signal["total_indicators"]
+                strength_bar = "█" * conf + "░" * (total - conf)
+                reasons_str = " | ".join(signal["reasons"][:4])
+
+                sig_msg = (
+                    f"╔═══════════════════════╗\n"
+                    f"║   SIGNAL 1M {signal['grade_emoji']}        ║\n"
+                    f"╚═══════════════════════╝\n\n"
+                    f"📊 الأصل: {name}\n"
+                    f"🕓 الوقت: {time_str}\n"
+                    f"⏳ المدة: M1\n"
+                    f"🎯 الاتجاه: {direction_emoji}\n\n"
+                    f"💪 القوة: [{strength_bar}] {conf}/{total}\n"
+                    f"📈 التقييم: {signal['grade_emoji']} {signal['grade_desc']}\n"
+                    f"📋 الأسباب: {reasons_str}\n"
+                )
+                if signal.get("sr_bonus"):
+                    sig_msg += f"🎯 {signal['sr_bonus']}\n"
+                signals_list.append(sig_msg)
+
+                try:
+                    Trade.create(
+                        user_id=user_id, asset=name,
+                        signal_type=signal["direction"],
+                        entry_price=signal["close"],
+                        confirmations=conf, grade=signal["grade"],
+                        reasons=", ".join(signal["reasons"]),
+                    )
+                except Exception as e:
+                    logger.error(f"خطأ في حفظ الصفقة: {e}")
+        except Exception as e:
+            logger.error(f"خطأ في تحليل {name}: {e}")
+            continue
+
+    if signals_list:
+        for sig_msg in signals_list:
+            await update.message.reply_text(sig_msg)
+            await asyncio.sleep(0.5)
+        await update.message.reply_text(f"✅ تم توليد {len(signals_list)} إشارة من {category_name}")
+    else:
+        await update.message.reply_text(
+            f"⏸ لا توجد إشارات قوية في {category_name} حالياً\n\n"
+            "💡 جرّب بعد دقائق أو فعّل /auto_on"
+        )
+
+
+async def forex_signals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إشارات الفوركس فقط"""
+    await analyze_by_category(update, context, "Forex", "أزواج الفوركس 💱")
+
+
+async def crypto_signals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إشارات العملات المشفرة فقط"""
+    await analyze_by_category(update, context, "Crypto", "العملات المشفرة ₿")
+
+
+async def stocks_signals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إشارات الأسهم الأمريكية فقط"""
+    await analyze_by_category(update, context, "Stocks", "الأسهم الأمريكية 📈")
+
+
+# ═══════════════════════════════════════════════════════════════
 # أمر /best - أفضل الأزواج حالياً
 # ═══════════════════════════════════════════════════════════════
 
@@ -921,6 +1029,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("signals", get_signals))
+    app.add_handler(CommandHandler("forex", forex_signals))
+    app.add_handler(CommandHandler("crypto", crypto_signals))
+    app.add_handler(CommandHandler("stocks", stocks_signals))
     app.add_handler(CommandHandler("best", best_pairs))
     app.add_handler(CommandHandler("market", market_overview))
     app.add_handler(CommandHandler("auto_on", auto_on))
