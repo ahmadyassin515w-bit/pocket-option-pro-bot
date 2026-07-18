@@ -53,16 +53,31 @@ class StrategyEngine:
 
         best = results[0]
 
-        # تعزيز الثقة إذا كان هناك إجماع
-        consensus = max(call_count, put_count) / len(results) if results else 0
-        if consensus >= 0.7:
-            best["confidence"] = min(100, best["confidence"] + 15)
+        # حساب الإجماع والثقة الحقيقية
+        total_strategies = len(self.strategies)  # 6 استراتيجيات
+        active_signals = len(results)  # كم استراتيجية أعطت إشارة
+        
+        consensus = max(call_count, put_count) / total_strategies if total_strategies else 0
+        agreement_ratio = max(call_count, put_count) / active_signals if active_signals else 0
+        
+        # الثقة الحقيقية = متوسط ثقة الاستراتيجيات المتفقة * نسبة الإجماع
+        agreeing_signal = "CALL" if call_count >= put_count else "PUT"
+        agreeing_results = [r for r in results if r["signal"] == agreeing_signal]
+        avg_confidence = sum(r.get("confidence", 50) for r in agreeing_results) / len(agreeing_results) if agreeing_results else 50
+        
+        # الثقة النهائية تعتمد على عدد الاستراتيجيات المتفقة
+        real_confidence = min(95, int(avg_confidence * consensus * 1.2))
+        
+        best = agreeing_results[0] if agreeing_results else results[0]
+        best["confidence"] = real_confidence
+        
+        if max(call_count, put_count) >= 2 and agreement_ratio >= 0.7:
             best["consensus"] = True
         else:
             best["consensus"] = False
 
         best["strategies_agree"] = max(call_count, put_count)
-        best["strategies_total"] = len(results)
+        best["strategies_total"] = total_strategies
 
         return best
 
