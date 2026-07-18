@@ -620,21 +620,42 @@ async def strategy_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
             continue
 
     if results:
-        results.sort(key=lambda x: x["strategy"].get("confidence", 0), reverse=True)
+        # فلتر: الإشارة يجب أن تتوافق مع الاتجاه
+        filtered_results = []
+        for r in results:
+            strat = r["strategy"]
+            trend = r["trend"]["trend"]
+            signal = strat["signal"]
+            # قبول فقط إذا الاتجاه يدعم الإشارة أو محايد
+            if (signal == "CALL" and trend in ["BULLISH", "NEUTRAL"]) or \
+               (signal == "PUT" and trend in ["BEARISH", "NEUTRAL"]):
+                filtered_results.append(r)
+            # أو إذا كان تباعد (انعكاس) مع ثقة عالية
+            elif r["divergence"].get("found") and strat.get("confidence", 0) >= 80:
+                filtered_results.append(r)
 
+        if not filtered_results:
+            filtered_results = results  # إذا لم يبقَ شيء، أعرض الكل
+
+        filtered_results.sort(key=lambda x: x["strategy"].get("confidence", 0), reverse=True)
+
+        now = get_local_time()
         msg = (
             "⟪🎯 التحليل الاستراتيجي المتقدم ⟫\n"
             "━━━━━━━━━━━━━━━━━━━━━\n\n"
         )
 
-        for i, r in enumerate(results[:5], 1):
+        for i, r in enumerate(filtered_results[:5], 1):
             strat = r["strategy"]
             direction = "🟢 CALL" if strat["signal"] == "CALL" else "🔴 PUT"
             confidence = strat.get("confidence", 0)
+            entry_time = now + timedelta(minutes=i * 2)
+            time_str = entry_time.strftime("%H:%M")
 
             msg += (
                 f"{i}. {r['name']}\n"
                 f"   {direction} | ثقة: {confidence}%\n"
+                f"   🕓 وقت الدخول: {time_str}\n"
                 f"   📊 {strat.get('strategy', 'N/A')}\n"
                 f"   📈 اتجاه: {r['trend']['trend']} ({r['trend']['confidence']}%)\n"
                 f"   📉 تقلبات: {r['volatility']['level']}\n"
@@ -650,7 +671,8 @@ async def strategy_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         msg += (
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            "💡 ركّز على الإشارات بثقة 75%+ مع إجماع"
+            "💡 ركّز على الإشارات بثقة 75%+ مع إجماع\n"
+            "⏰ ادخل الصفقة في الوقت المحدد"
         )
         await update.message.reply_text(msg)
     else:

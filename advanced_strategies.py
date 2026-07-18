@@ -217,28 +217,28 @@ class StrategyEngine:
         bullish_momentum = 0
         bearish_momentum = 0
 
-        # RSI
-        if rsi < 40:
+        # RSI - فوق 50 = صاعد، تحت 50 = هابط
+        if rsi > 55:
             bullish_momentum += 1
-        elif rsi > 60:
+        elif rsi < 45:
             bearish_momentum += 1
 
-        # Stochastic
-        if stoch_k < 35:
+        # Stochastic - فوق 50 = صاعد، تحت 50 = هابط
+        if stoch_k > 55:
             bullish_momentum += 1
-        elif stoch_k > 65:
+        elif stoch_k < 45:
             bearish_momentum += 1
 
-        # CCI
-        if cci < -50:
+        # CCI - إيجابي = صاعد، سلبي = هابط
+        if cci > 50:
             bullish_momentum += 1
-        elif cci > 50:
+        elif cci < -50:
             bearish_momentum += 1
 
-        # Williams %R
-        if williams < -65:
+        # Williams %R - فوق -50 = صاعد، تحت -50 = هابط
+        if williams > -35:
             bullish_momentum += 1
-        elif williams > -35:
+        elif williams < -65:
             bearish_momentum += 1
 
         # MACD
@@ -255,14 +255,14 @@ class StrategyEngine:
             return {
                 "signal": "CALL",
                 "strategy": "Multi-Momentum ↑",
-                "confidence": 85,
+                "confidence": min(95, 70 + bullish_momentum * 5),
                 "reason": f"زخم صاعد قوي ({bullish_momentum}/5 مؤشرات)"
             }
         elif bearish_momentum >= 4:
             return {
                 "signal": "PUT",
                 "strategy": "Multi-Momentum ↓",
-                "confidence": 85,
+                "confidence": min(95, 70 + bearish_momentum * 5),
                 "reason": f"زخم هابط قوي ({bearish_momentum}/5 مؤشرات)"
             }
 
