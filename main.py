@@ -275,6 +275,15 @@ async def analyze_all_assets_v2(user_id=0, min_conf=None):
                 # إشارة أساسية موجودة - نعززها
                 final_signal = signal
 
+                # ═══ فلتر الاتجاه: لا تدخل عكس الاتجاه المؤكد 80%+ ═══
+                trend_against = (
+                    (trend_info["trend"] == "BULLISH" and trend_info["confidence"] >= 80 and signal["direction"] == "PUT") or
+                    (trend_info["trend"] == "BEARISH" and trend_info["confidence"] >= 80 and signal["direction"] == "CALL")
+                )
+                if trend_against:
+                    final_signal = None
+                    continue
+
                 # تعزيز بالاستراتيجيات
                 if strategy_result.get("signal") == signal["direction"]:
                     signal["confirmations"] = min(12, signal["confirmations"] + 1)
@@ -285,6 +294,10 @@ async def analyze_all_assets_v2(user_id=0, min_conf=None):
                     extra_info.append(f"📈 اتجاه مؤكد ({trend_info['confidence']}%)")
                 elif trend_info["trend"] == "BEARISH" and signal["direction"] == "PUT":
                     extra_info.append(f"📉 اتجاه مؤكد ({trend_info['confidence']}%)")
+                else:
+                    # الاتجاه لا يدعم - تخفيض التأكيدات
+                    if trend_info["trend"] != "NEUTRAL" and trend_info["confidence"] >= 60:
+                        signal["confirmations"] = max(min_conf, signal["confirmations"] - 1)
 
                 # تعزيز بالتباعد
                 if div_info.get("found"):

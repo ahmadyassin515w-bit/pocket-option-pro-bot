@@ -14,17 +14,14 @@ TWELVE_DATA_KEY = os.getenv("TWELVE_DATA_KEY", "")
 # أزواج العملات OTC المتاحة على Pocket Option
 # ═══════════════════════════════════════════════════════════════
 ASSETS_TO_MONITOR = [
-    # ═══ أزواج الفوركس OTC (عالية الأداء) ═══
+    # ═══ أزواج الفوركس OTC (الأقوى والأكثر ربحية) ═══
     {"symbol": "AUDCAD=X", "name": "AUD/CAD-OTC", "category": "Forex"},
     {"symbol": "AUDCHF=X", "name": "AUD/CHF-OTC", "category": "Forex"},
     {"symbol": "AUDNZD=X", "name": "AUD/NZD-OTC", "category": "Forex"},
-    {"symbol": "EURCHF=X", "name": "EUR/CHF-OTC", "category": "Forex"},
-    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Forex"},
-    {"symbol": "EURNZD=X", "name": "EUR/NZD-OTC", "category": "Forex"},
-    {"symbol": "EURGBP=X", "name": "EUR/GBP-OTC", "category": "Forex"},
-    {"symbol": "EURJPY=X", "name": "EUR/JPY-OTC", "category": "Forex"},
     {"symbol": "CADCHF=X", "name": "CAD/CHF-OTC", "category": "Forex"},
-    {"symbol": "CADJPY=X", "name": "CAD/JPY-OTC", "category": "Forex"},
+    {"symbol": "EURUSD=X", "name": "EUR/USD-OTC", "category": "Forex"},
+    {"symbol": "EURCHF=X", "name": "EUR/CHF-OTC", "category": "Forex"},
+    {"symbol": "USDCHF=X", "name": "USD/CHF-OTC", "category": "Forex"},
     {"symbol": "CHFJPY=X", "name": "CHF/JPY-OTC", "category": "Forex"},
     # ═══ العملات المشفرة ═══
     {"symbol": "BTC-USD", "name": "Bitcoin", "category": "Crypto"},
@@ -107,10 +104,10 @@ MAX_DAILY_TRADES = 30
 MIN_CONFIRMATIONS = 6
 
 # إعدادات الإشارات التلقائية (بالدقائق)
-AUTO_SIGNAL_INTERVAL = 5
+AUTO_SIGNAL_INTERVAL = 3
 
 # الحد الأقصى للإشارات لكل طلب
-MAX_SIGNALS_PER_REQUEST = 5
+MAX_SIGNALS_PER_REQUEST = 10
 
 # ═══════════════════════════════════════════════════════════════
 # إعدادات إدارة المخاطر

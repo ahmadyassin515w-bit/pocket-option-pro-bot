@@ -462,6 +462,21 @@ def generate_signal_for_asset(df, min_conf_override=None):
     if abs(call_conf - put_conf) < 2:
         return None
 
+    # فلتر الشموع: لا تدخل عكس آخر 3 شموع
+    try:
+        last_3_closes = [float(df_clean.iloc[-i]['Close']) for i in range(1, 4)]
+        candles_up = last_3_closes[0] > last_3_closes[1] > last_3_closes[2]  # 3 شموع صاعدة
+        candles_down = last_3_closes[0] < last_3_closes[1] < last_3_closes[2]  # 3 شموع هابطة
+        
+        # لا تدخل PUT إذا آخر 3 شموع صاعدة بقوة
+        if candles_up and put_conf > call_conf:
+            return None
+        # لا تدخل CALL إذا آخر 3 شموع هابطة بقوة
+        if candles_down and call_conf > put_conf:
+            return None
+    except Exception:
+        pass
+
     # تعزيز الإشارة إذا كانت قريبة من دعم/مقاومة
     sr_bonus = ""
     if sr_info["near_support"] and call_conf > put_conf:
