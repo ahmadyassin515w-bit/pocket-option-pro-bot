@@ -13,6 +13,7 @@ from telegram.ext import (
     CallbackQueryHandler, ConversationHandler
 )
 import asyncio
+import os
 
 from config import (
     TELEGRAM_BOT_TOKEN, ASSETS_TO_MONITOR,
@@ -35,6 +36,7 @@ from ml_engine import (
     ml_engine, volatility_analyzer, trend_confirmation, divergence_detector
 )
 from advanced_strategies import strategy_engine
+from chart_generator import generate_chart, generate_quick_chart
 
 # ═══════════════════════════════════════════════════════════════
 # إعداد التسجيل
@@ -1358,6 +1360,18 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update_user_setting(user_id, "capital", capital)
         response = f"✅ تم تحديث رأس المال إلى: ${capital}"
 
+    elif data.startswith("chart_"):
+        symbol = data.replace("chart_", "")
+        target_asset = None
+        for asset in ASSETS_TO_MONITOR:
+            if asset["symbol"] == symbol:
+                target_asset = asset
+                break
+        if target_asset:
+            await send_chart_for_asset(update, target_asset)
+        else:
+            response = "❌ لم أجد الزوج"
+
     if response:
         await query.edit_message_text(response)
 
@@ -1421,6 +1435,169 @@ async def daily_report_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ═══════════════════════════════════════════════════════════════
+# أمر /chart - الرسم البياني
+# ═══════════════════════════════════════════════════════════════
+
+async def chart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض الرسم البياني لزوج محدد"""
+    # إذا المستخدم حدد زوج
+    if context.args:
+        asset_query = " ".join(context.args).upper()
+        # البحث عن الزوج
+        target_asset = None
+        for asset in ASSETS_TO_MONITOR:
+            if asset_query in asset["name"].upper() or asset_query in asset["symbol"].upper():
+                target_asset = asset
+                break
+        
+        if not target_asset:
+            await update.message.reply_text(
+                f"❌ لم أجد الزوج: {asset_query}\n"
+                f"📝 استخدم: /chart EURUSD أو /chart BTC"
+            )
+            return
+        
+        await send_chart_for_asset(update, target_asset)
+    else:
+        # عرض قائمة الأزواج
+        keyboard = []
+        forex_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Forex"]
+        crypto_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Crypto"]
+        stocks_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Stocks"]
+        
+        # فوركس
+        row = []
+        for asset in forex_assets[:4]:
+            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+        keyboard.append(row)
+        row = []
+        for asset in forex_assets[4:]:
+            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+        keyboard.append(row)
+        
+        # كريبتو
+        row = []
+        for asset in crypto_assets[:5]:
+            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+        keyboard.append(row)
+        if len(crypto_assets) > 5:
+            row = []
+            for asset in crypto_assets[5:]:
+                row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+            keyboard.append(row)
+        
+        # أسهم
+        row = []
+        for asset in stocks_assets[:5]:
+            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+        keyboard.append(row)
+        if len(stocks_assets) > 5:
+            row = []
+            for asset in stocks_assets[5:]:
+                row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+            keyboard.append(row)
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "📊 اختر الزوج لعرض الرسم البياني:\n\n"
+            "أو استخدم: /chart EURUSD",
+            reply_markup=reply_markup
+        )
+
+
+async def send_chart_for_asset(update, asset_info):
+    """توليد وإرسال شارت لزوج محدد"""
+    symbol = asset_info["symbol"]
+    name = asset_info["name"]
+    
+    # إرسال رسالة انتظار
+    if hasattr(update, 'message') and update.message:
+        wait_msg = await update.message.reply_text(f"⏳ جاري توليد شارت {name}...")
+    elif hasattr(update, 'callback_query'):
+        wait_msg = await update.callback_query.message.reply_text(f"⏳ جاري توليد شارت {name}...")
+    else:
+        wait_msg = None
+    
+    try:
+        # جلب البيانات
+        data = fetch_forex_data(symbol, name)
+        
+        if data is None or data.empty or len(data) < 30:
+            if wait_msg:
+                await wait_msg.edit_text(f"❌ لا توجد بيانات كافية لـ {name}")
+            return
+        
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
+        
+        # حساب المؤشرات
+        df_ta = calculate_all_indicators(data.copy())
+        
+        if df_ta is None or df_ta.empty:
+            if wait_msg:
+                await wait_msg.edit_text(f"❌ خطأ في حساب المؤشرات لـ {name}")
+            return
+        
+        # توليد إشارة (إن وجدت)
+        signal = generate_signal_for_asset(df_ta)
+        
+        signal_dir = None
+        entry_price = None
+        support = None
+        resistance = None
+        
+        if signal:
+            signal_dir = signal["direction"]
+            entry_price = signal["close"]
+            support = signal.get("support")
+            resistance = signal.get("resistance")
+        
+        # توليد الشارت
+        chart_path = generate_chart(
+            df_ta, name,
+            signal_direction=signal_dir,
+            entry_price=entry_price,
+            support=support,
+            resistance=resistance
+        )
+        
+        if chart_path and os.path.exists(chart_path):
+            # إرسال الصورة
+            caption = f"📊 {name} - M1\n"
+            if signal:
+                direction_emoji = "🟢 CALL ↑" if signal_dir == "CALL" else "🔴 PUT ↓"
+                caption += f"🎯 إشارة: {direction_emoji}\n"
+                caption += f"💪 القوة: {signal['confirmations']}/12\n"
+            else:
+                caption += "⏸ لا توجد إشارة حالياً"
+            
+            if hasattr(update, 'message') and update.message:
+                await update.message.reply_photo(
+                    photo=open(chart_path, 'rb'),
+                    caption=caption
+                )
+            elif hasattr(update, 'callback_query'):
+                await update.callback_query.message.reply_photo(
+                    photo=open(chart_path, 'rb'),
+                    caption=caption
+                )
+            
+            # حذف الملف المؤقت
+            os.remove(chart_path)
+            
+            if wait_msg:
+                await wait_msg.delete()
+        else:
+            if wait_msg:
+                await wait_msg.edit_text(f"❌ خطأ في توليد الشارت لـ {name}")
+    
+    except Exception as e:
+        logger.error(f"خطأ في إرسال الشارت: {e}")
+        if wait_msg:
+            await wait_msg.edit_text(f"❌ خطأ: {str(e)[:100]}")
+
+
+# ═══════════════════════════════════════════════════════════════
 # الدالة الرئيسية
 # ═══════════════════════════════════════════════════════════════
 
@@ -1455,6 +1632,7 @@ def main():
     app.add_handler(CommandHandler("settings", settings))
     app.add_handler(CommandHandler("win", record_win))
     app.add_handler(CommandHandler("loss", record_loss))
+    app.add_handler(CommandHandler("chart", chart_command))
 
     # معالج الأزرار
     app.add_handler(CallbackQueryHandler(button_callback))
