@@ -1459,10 +1459,9 @@ async def chart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await send_chart_for_asset(update, target_asset)
     else:
-        # عرض قائمة الأزواج
+        # عرض قائمة الأزواج (فوركس + أسهم فقط)
         keyboard = []
         forex_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Forex"]
-        crypto_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Crypto"]
         stocks_assets = [a for a in ASSETS_TO_MONITOR if a["category"] == "Stocks"]
         
         # فوركس
@@ -1475,27 +1474,17 @@ async def chart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
         keyboard.append(row)
         
-        # كريبتو
-        row = []
-        for asset in crypto_assets[:5]:
-            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
-        keyboard.append(row)
-        if len(crypto_assets) > 5:
-            row = []
-            for asset in crypto_assets[5:]:
-                row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
-            keyboard.append(row)
-        
         # أسهم
-        row = []
-        for asset in stocks_assets[:5]:
-            row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
-        keyboard.append(row)
-        if len(stocks_assets) > 5:
+        if stocks_assets:
             row = []
-            for asset in stocks_assets[5:]:
+            for asset in stocks_assets[:5]:
                 row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
             keyboard.append(row)
+            if len(stocks_assets) > 5:
+                row = []
+                for asset in stocks_assets[5:]:
+                    row.append(InlineKeyboardButton(asset["name"], callback_data=f"chart_{asset['symbol']}"))
+                keyboard.append(row)
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -1546,6 +1535,8 @@ async def send_chart_for_asset(update, asset_info):
         support = None
         resistance = None
         
+        entry_time = datetime.now().strftime('%H:%M')
+        
         if signal:
             signal_dir = signal["direction"]
             entry_price = signal["close"]
@@ -1558,7 +1549,8 @@ async def send_chart_for_asset(update, asset_info):
             signal_direction=signal_dir,
             entry_price=entry_price,
             support=support,
-            resistance=resistance
+            resistance=resistance,
+            entry_time=entry_time
         )
         
         if chart_path and os.path.exists(chart_path):
@@ -1567,6 +1559,7 @@ async def send_chart_for_asset(update, asset_info):
             if signal:
                 direction_emoji = "🟢 CALL ↑" if signal_dir == "CALL" else "🔴 PUT ↓"
                 caption += f"🎯 إشارة: {direction_emoji}\n"
+                caption += f"🕓 وقت الدخول: {entry_time}\n"
                 caption += f"💪 القوة: {signal['confirmations']}/12\n"
             else:
                 caption += "⏸ لا توجد إشارة حالياً"

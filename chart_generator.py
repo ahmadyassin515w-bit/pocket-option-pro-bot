@@ -26,7 +26,7 @@ plt.rcParams['grid.color'] = '#0f3460'
 plt.rcParams['grid.alpha'] = 0.3
 
 
-def generate_chart(df, asset_name, signal_direction=None, entry_price=None, support=None, resistance=None):
+def generate_chart(df, asset_name, signal_direction=None, entry_price=None, support=None, resistance=None, entry_time=None):
     """
     يولّد صورة شارت شموع احترافي مع المؤشرات
     
@@ -110,22 +110,37 @@ def generate_chart(df, asset_name, signal_direction=None, entry_price=None, supp
             ax1.text(len(chart_data) - 1, resistance, f' مقاومة {resistance:.5f}', 
                     color='#ff1744', fontsize=8, va='top')
         
-        # ═══ سهم نقطة الدخول ═══
+        # ═══ سهم نقطة الدخول بالدقيقة ═══
         if signal_direction and entry_price:
             last_x = len(chart_data) - 1
+            price_range = chart_data['High'].max() - chart_data['Low'].min()
+            
+            # وقت الدخول
+            if entry_time:
+                time_label = entry_time
+            else:
+                time_label = datetime.now().strftime('%H:%M')
             
             if signal_direction == "CALL":
                 arrow_color = '#00e676'
-                ax1.annotate('⬆ CALL', xy=(last_x, entry_price),
-                           xytext=(last_x - 3, entry_price - (chart_data['High'].max() - chart_data['Low'].min()) * 0.1),
+                label = f'⬆ CALL\n🕓 {time_label}'
+                ax1.annotate(label, xy=(last_x, entry_price),
+                           xytext=(last_x - 5, entry_price - price_range * 0.15),
                            fontsize=11, fontweight='bold', color=arrow_color,
-                           arrowprops=dict(arrowstyle='->', color=arrow_color, lw=2))
+                           arrowprops=dict(arrowstyle='->', color=arrow_color, lw=2.5),
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='#1a3a1a', edgecolor=arrow_color, alpha=0.8))
+                # خط أفقي عند نقطة الدخول
+                ax1.axhline(y=entry_price, color=arrow_color, linestyle=':', linewidth=1, alpha=0.6)
             else:
                 arrow_color = '#ff1744'
-                ax1.annotate('⬇ PUT', xy=(last_x, entry_price),
-                           xytext=(last_x - 3, entry_price + (chart_data['High'].max() - chart_data['Low'].min()) * 0.1),
+                label = f'⬇ PUT\n🕓 {time_label}'
+                ax1.annotate(label, xy=(last_x, entry_price),
+                           xytext=(last_x - 5, entry_price + price_range * 0.15),
                            fontsize=11, fontweight='bold', color=arrow_color,
-                           arrowprops=dict(arrowstyle='->', color=arrow_color, lw=2))
+                           arrowprops=dict(arrowstyle='->', color=arrow_color, lw=2.5),
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='#3a1a1a', edgecolor=arrow_color, alpha=0.8))
+                # خط أفقي عند نقطة الدخول
+                ax1.axhline(y=entry_price, color=arrow_color, linestyle=':', linewidth=1, alpha=0.6)
         
         # ═══ إعدادات المحور الأول ═══
         ax1.set_title(f'📊 {asset_name} - M1', fontsize=14, fontweight='bold', 
