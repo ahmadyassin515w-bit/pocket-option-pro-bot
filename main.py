@@ -185,8 +185,31 @@ async def get_signals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     signals = await analyze_all_assets_v2(user_id, min_conf)
 
     if signals:
-        for sig_msg in signals:
-            await update.message.reply_text(sig_msg)
+        for sig_data in signals:
+            # إرسال رسالة الإشارة
+            await update.message.reply_text(sig_data["message"])
+            
+            # توليد وإرسال الشارت مع الإشارة
+            try:
+                if sig_data.get("df") is not None:
+                    chart_path = generate_chart(
+                        sig_data["df"],
+                        sig_data["asset_name"],
+                        signal_direction=sig_data["direction"],
+                        entry_price=sig_data["entry_price"],
+                        support=sig_data.get("support"),
+                        resistance=sig_data.get("resistance"),
+                        entry_time=sig_data["entry_time"]
+                    )
+                    if chart_path and os.path.exists(chart_path):
+                        await update.message.reply_photo(
+                            photo=open(chart_path, 'rb'),
+                            caption=f"📊 {sig_data['asset_name']} | 🕓 {sig_data['entry_time']} | {'CALL ↑' if sig_data['direction'] == 'CALL' else 'PUT ↓'}"
+                        )
+                        os.remove(chart_path)
+            except Exception as e:
+                logger.error(f"خطأ في توليد الشارت: {e}")
+            
             await asyncio.sleep(0.5)
 
         rm = RiskManager(user_id)
@@ -364,7 +387,9 @@ async def analyze_all_assets_v2(user_id=0, min_conf=None):
                     final_signal["grade_emoji"] = "🅱️"
                     final_signal["grade_desc"] = "جيدة"
 
-                signal_time = now + timedelta(minutes=len(signals_list) * 2 + 1)
+                import random as _rnd
+                spacing = _rnd.randint(5, 10)
+                signal_time = now + timedelta(minutes=len(signals_list) * spacing + 1)
                 time_str = signal_time.strftime("%H:%M")
 
                 direction_emoji = "🟢 CALL ↑" if final_signal["direction"] == "CALL" else "🔴 PUT ↓"
@@ -400,7 +425,16 @@ async def analyze_all_assets_v2(user_id=0, min_conf=None):
                 if final_signal.get("sr_bonus"):
                     sig_msg += f"\n🎯 {final_signal['sr_bonus']}"
 
-                signals_list.append(sig_msg)
+                signals_list.append({
+                    "message": sig_msg,
+                    "asset_name": name,
+                    "direction": final_signal["direction"],
+                    "entry_price": final_signal["close"],
+                    "entry_time": time_str,
+                    "support": final_signal.get("support"),
+                    "resistance": final_signal.get("resistance"),
+                    "df": df_ta.copy() if df_ta is not None else None,
+                })
 
                 # حفظ في قاعدة البيانات
                 try:
@@ -512,7 +546,9 @@ async def analyze_by_category(update: Update, context: ContextTypes.DEFAULT_TYPE
                 elif conf >= 7:
                     final_signal["grade"], final_signal["grade_emoji"], final_signal["grade_desc"] = "B", "🅱️", "جيدة"
 
-                signal_time = now + timedelta(minutes=len(signals_list) * 2 + 1)
+                import random as _rnd
+                spacing = _rnd.randint(5, 10)
+                signal_time = now + timedelta(minutes=len(signals_list) * spacing + 1)
                 time_str = signal_time.strftime("%H:%M")
                 direction_emoji = "🟢 CALL ↑" if final_signal["direction"] == "CALL" else "🔴 PUT ↓"
                 total = final_signal["total_indicators"]
@@ -542,7 +578,16 @@ async def analyze_by_category(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if final_signal.get("sr_bonus"):
                     sig_msg += f"\n🎯 {final_signal['sr_bonus']}"
 
-                signals_list.append(sig_msg)
+                signals_list.append({
+                    "message": sig_msg,
+                    "asset_name": name,
+                    "direction": final_signal["direction"],
+                    "entry_price": final_signal["close"],
+                    "entry_time": time_str,
+                    "support": final_signal.get("support"),
+                    "resistance": final_signal.get("resistance"),
+                    "df": df_ta.copy() if df_ta is not None else None,
+                })
 
                 try:
                     Trade.create(
@@ -559,8 +604,28 @@ async def analyze_by_category(update: Update, context: ContextTypes.DEFAULT_TYPE
             continue
 
     if signals_list:
-        for sig_msg in signals_list:
-            await update.message.reply_text(sig_msg)
+        for sig_data in signals_list:
+            await update.message.reply_text(sig_data["message"])
+            # إرسال الشارت
+            try:
+                if sig_data.get("df") is not None:
+                    chart_path = generate_chart(
+                        sig_data["df"],
+                        sig_data["asset_name"],
+                        signal_direction=sig_data["direction"],
+                        entry_price=sig_data["entry_price"],
+                        support=sig_data.get("support"),
+                        resistance=sig_data.get("resistance"),
+                        entry_time=sig_data["entry_time"]
+                    )
+                    if chart_path and os.path.exists(chart_path):
+                        await update.message.reply_photo(
+                            photo=open(chart_path, 'rb'),
+                            caption=f"📊 {sig_data['asset_name']} | 🕓 {sig_data['entry_time']} | {'CALL ↑' if sig_data['direction'] == 'CALL' else 'PUT ↓'}"
+                        )
+                        os.remove(chart_path)
+            except Exception as e:
+                logger.error(f"خطأ في توليد الشارت: {e}")
             await asyncio.sleep(0.5)
         await update.message.reply_text(
             f"✅ تم توليد {len(signals_list)} إشارة من {category_name}\n"
@@ -969,9 +1034,30 @@ async def auto_signals_job(context: ContextTypes.DEFAULT_TYPE):
             chat_id=chat_id,
             text=f"🔔 إشارات تلقائية ذكية - {now.strftime('%H:%M')}\n━━━━━━━━━━━━━━━━━━━━━"
         )
-        for sig_msg in signals:
-            await context.bot.send_message(chat_id=chat_id, text=sig_msg)
-            await asyncio.sleep(0.3)
+        for sig_data in signals:
+            await context.bot.send_message(chat_id=chat_id, text=sig_data["message"])
+            # إرسال الشارت مع كل إشارة تلقائية
+            try:
+                if sig_data.get("df") is not None:
+                    chart_path = generate_chart(
+                        sig_data["df"],
+                        sig_data["asset_name"],
+                        signal_direction=sig_data["direction"],
+                        entry_price=sig_data["entry_price"],
+                        support=sig_data.get("support"),
+                        resistance=sig_data.get("resistance"),
+                        entry_time=sig_data["entry_time"]
+                    )
+                    if chart_path and os.path.exists(chart_path):
+                        await context.bot.send_photo(
+                            chat_id=chat_id,
+                            photo=open(chart_path, 'rb'),
+                            caption=f"📊 {sig_data['asset_name']} | 🕓 {sig_data['entry_time']} | {'CALL ↑' if sig_data['direction'] == 'CALL' else 'PUT ↓'}"
+                        )
+                        os.remove(chart_path)
+            except Exception as e:
+                logger.error(f"خطأ في توليد شارت تلقائي: {e}")
+            await asyncio.sleep(0.5)
 
 
 async def auto_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
